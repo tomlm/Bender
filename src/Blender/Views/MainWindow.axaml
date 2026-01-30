@@ -49,10 +49,36 @@
             <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF6666"/>
         </Border>
         
+        <!-- Welcome message when no data is loaded -->
+        <StackPanel IsVisible="{Binding !HasData}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="16">
+            <TextBlock Text="Blender" 
+                       FontSize="32" 
+                       FontWeight="Light"
+                       HorizontalAlignment="Center"
+                       Foreground="#808080"/>
+            <TextBlock Text="Open a file or pipe data to visualize" 
+                       FontSize="14"
+                       HorizontalAlignment="Center"
+                       Foreground="#606060"/>
+            <TextBlock Text="Ctrl+O to open a file" 
+                       FontSize="12"
+                       HorizontalAlignment="Center"
+                       Foreground="#505050"/>
+        </StackPanel>
+        
         <!-- Raw text view -->
         <ScrollViewer IsVisible="{Binding IsRawView}"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
+            <ScrollViewer.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="IsRawView"/>
+                    <Binding Path="HasData"/>
+                </MultiBinding>
+            </ScrollViewer.IsVisible>
             <TextBox Text="{Binding InputData, Mode=OneWay}"
                      IsReadOnly="True"
                      AcceptsReturn="True"
@@ -65,8 +91,14 @@
         </ScrollViewer>
         
         <!-- Object viewer -->
-        <dv:ObjectViewer Value="{Binding Data}" 
-                         IsVisible="{Binding IsObjectsView}"/>
+        <dv:ObjectViewer Value="{Binding Data}">
+            <dv:ObjectViewer.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="IsObjectsView"/>
+                    <Binding Path="HasData"/>
+                </MultiBinding>
+            </dv:ObjectViewer.IsVisible>
+        </dv:ObjectViewer>
     </DockPanel>
 
 </Window>

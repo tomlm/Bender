@@ -33,6 +33,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private DataFormat _format = DataFormat.Auto;
 
+
     [ObservableProperty]
     private string? _inputData;
 
@@ -48,6 +49,14 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     [ObservableProperty]
     private object? _data;
+
+    /// <summary>
+    /// Gets whether there is data loaded to display.
+    /// </summary>
+    public bool HasData => Data != null || !string.IsNullOrEmpty(InputData);
+
+    partial void OnDataChanged(object? value) => OnPropertyChanged(nameof(HasData));
+    partial void OnInputDataChanged(string? value) => OnPropertyChanged(nameof(HasData));
 
     /// <summary>
     /// Gets or sets the current view mode.
@@ -113,17 +122,8 @@ public partial class MainWindowViewModel : ViewModelBase
         var file = files[0];
         var filePath = file.Path.LocalPath;
 
-        // Create a new window with the selected file
-        var newViewModel = new MainWindowViewModel();
-        await newViewModel.LoadFromFileAsync(filePath);
-
-        var newWindow = new Blender.Views.MainWindow
-        {
-            DataContext = newViewModel
-        };
-        newViewModel.Window = newWindow;
-
-        newWindow.Show();
+        // Load the file into the current window
+        await LoadFromFileAsync(filePath);
     }
 
     [RelayCommand]
