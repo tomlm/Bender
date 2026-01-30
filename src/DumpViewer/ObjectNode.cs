@@ -180,12 +180,18 @@ public partial class ObjectNode : ObservableObject
             return (NodeKind.Object, "", objTypeName, true);
         }
 
-        // ExpandoObject (from CsvHelper dynamic records)
+        // ExpandoObject or dynamic objects (from CsvHelper dynamic records)
+        // FastDynamicObject and similar implement IDictionary<string, object>
         if (value is ExpandoObject expando)
         {
             var expandoDict = (IDictionary<string, object?>)expando;
-            var objTypeName = _inferredItemTypeName ?? "Object";
+            var objTypeName = _inferredItemTypeName ?? "Row";
             return (NodeKind.Object, "", objTypeName, expandoDict.Count > 0);
+        }
+        if (value is IDictionary<string, object> dynamicDict && IsDynamicObject(type))
+        {
+            var objTypeName = _inferredItemTypeName ?? "Row";
+            return (NodeKind.Object, "", objTypeName, dynamicDict.Count > 0);
         }
 
         // === Standard type handling ===
@@ -241,7 +247,20 @@ public partial class ObjectNode : ObservableObject
         // Collections/Arrays
         if (value is IEnumerable enumerable and not string)
         {
-            var count = enumerable.Cast<object?>().Count();
+            var items = enumerable.Cast<object?>().ToList();
+            var count = items.Count;
+            
+            // Check if this is a collection of dynamic objects (CSV data)
+            if (count > 0 && items[0] != null)
+            {
+                var firstItem = items[0]!;
+                var firstType = firstItem.GetType();
+                if (firstItem is ExpandoObject || (firstItem is IDictionary<string, object> && IsDynamicObject(firstType)))
+                {
+                    return (NodeKind.Collection, $"({count} items)", "Array", count > 0);
+                }
+            }
+            
             return (NodeKind.Collection, $"({count} items)", typeName, count > 0);
         }
 
@@ -430,6 +449,16 @@ public partial class ObjectNode : ObservableObject
             return children;
         }
 
+        // Dynamic objects like FastDynamicObject (from CsvHelper)
+        if (Value is IDictionary<string, object> dynamicDict && IsDynamicObject(type))
+        {
+            foreach (var kvp in dynamicDict.OrderBy(k => k.Key))
+            {
+                children.Add(new ObjectNode(kvp.Value, kvp.Key, _maxDepth, _currentDepth + 1, newVisited));
+            }
+            return children;
+        }
+
         // === Standard type handling ===
 
         // Dictionary
@@ -449,7 +478,17 @@ public partial class ObjectNode : ObservableObject
             int index = 0;
             foreach (var item in enumerable)
             {
-                children.Add(new ObjectNode(item, $"[{index}]", _maxDepth, _currentDepth + 1, newVisited, _inferredItemTypeName));
+                // For dynamic objects (CSV rows), infer "Row" as the type name if not already set
+                var itemTypeName = _inferredItemTypeName;
+                if (itemTypeName == null && item != null)
+                {
+                    var itemType = item.GetType();
+                    if (item is ExpandoObject || (item is IDictionary<string, object> && IsDynamicObject(itemType)))
+                    {
+                        itemTypeName = "Row";
+                    }
+                }
+                children.Add(new ObjectNode(item, $"[{index}]", _maxDepth, _currentDepth + 1, newVisited, itemTypeName));
                 index++;
             }
             return children;
@@ -486,6 +525,23 @@ public partial class ObjectNode : ObservableObject
         return type.IsPrimitive || 
                type == typeof(decimal) || 
                type == typeof(byte[]);
+    }
+
+    /// <summary>
+    /// Checks if a type is a dynamic object (like FastDynamicObject from CsvHelper).
+    /// </summary>
+    private static bool IsDynamicObject(Type type)
+    {
+        // Check for common dynamic object types
+        var typeName = type.Name;
+        if (typeName.Contains("Dynamic", StringComparison.OrdinalIgnoreCase))
+            return true;
+        
+        // Check if it inherits from DynamicObject
+        if (typeof(DynamicObject).IsAssignableFrom(type))
+            return true;
+
+        return false;
     }
 
     private static string FormatPrimitive(object value)
