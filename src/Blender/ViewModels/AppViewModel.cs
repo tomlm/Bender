@@ -1,9 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using System.Globalization;
 using System.IO;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
+using System.Xml;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CsvHelper;
+using YamlDotNet.RepresentationModel;
 
 namespace Blender.ViewModels;
 
@@ -38,6 +44,13 @@ public partial class AppViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _hasError;
+
+    /// <summary>
+    /// Gets the deserialized data object based on the detected format.
+    /// Can be JsonNode, XmlDocument, YamlStream, or List&lt;dynamic&gt; for CSV.
+    /// </summary>
+    [ObservableProperty]
+    private object? _data;
 
     /// <summary>
     /// Parses command line arguments and loads input data.
@@ -141,7 +154,56 @@ public partial class AppViewModel : ViewModelBase
             Format = DetectFormat(InputData, FilePath);
         }
 
+        // Deserialize the input data based on format
+        if (!string.IsNullOrEmpty(InputData) && Format != DataFormat.Auto)
+        {
+            try
+            {
+                Data = DeserializeData(InputData, Format);
+            }
+            catch (Exception ex)
+            {
+                HasError = true;
+                ErrorMessage = $"Error deserializing {Format} data: {ex.Message}";
+                return false;
+            }
+        }
+
         return true;
+    }
+
+    private static object? DeserializeData(string data, DataFormat format)
+    {
+        return format switch
+        {
+            DataFormat.Json => JsonNode.Parse(data),
+            DataFormat.Xml => ParseXml(data),
+            DataFormat.Yaml => ParseYaml(data),
+            DataFormat.Csv => ParseCsv(data),
+            _ => null
+        };
+    }
+
+    private static XmlDocument ParseXml(string data)
+    {
+        var doc = new XmlDocument();
+        doc.LoadXml(data);
+        return doc;
+    }
+
+    private static YamlStream ParseYaml(string data)
+    {
+        var yaml = new YamlStream();
+        using var reader = new StringReader(data);
+        yaml.Load(reader);
+        return yaml;
+    }
+
+    private static List<dynamic> ParseCsv(string data)
+    {
+        using var reader = new StringReader(data);
+        using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+        return [.. csv.GetRecords<dynamic>()];
     }
 
     private static DataFormat DetermineFormat(bool isXml, bool isYaml, bool isJson, bool isCsv)
