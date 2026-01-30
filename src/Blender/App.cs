@@ -9,21 +9,34 @@ namespace Blender
     public class App : Application
     {
         /// <summary>
-        /// Gets the application-wide view model containing command line arguments and input data.
+        /// Gets the application-wide view model containing command line arguments.
         /// </summary>
         public AppViewModel AppViewModel { get; } = new();
 
-        public override void OnFrameworkInitializationCompleted()
+        public override async void OnFrameworkInitializationCompleted()
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopLifetime)
             {
-                // Initialize the AppViewModel with command line arguments
+                // Parse command line arguments
                 var args = desktopLifetime.Args ?? [];
-                _ = AppViewModel.InitializeAsync(args);
+                await AppViewModel.ParseArgumentsAsync(args);
+
+                // Create the main window with its own data context
+                var mainViewModel = new MainWindowViewModel();
+
+                // Load data based on CLI arguments
+                if (!string.IsNullOrEmpty(AppViewModel.FilePath))
+                {
+                    await mainViewModel.LoadFromFileAsync(AppViewModel.FilePath, AppViewModel.Format);
+                }
+                else
+                {
+                    await mainViewModel.LoadFromStdinAsync(AppViewModel.Format);
+                }
 
                 desktopLifetime.MainWindow = new MainWindow
                 {
-                    DataContext = new MainWindowViewModel(AppViewModel)
+                    DataContext = mainViewModel
                 };
             }
 
