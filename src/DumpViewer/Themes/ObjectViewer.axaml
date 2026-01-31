@@ -20,8 +20,13 @@
         <Setter Property="Template">
             <ControlTemplate>
                 <Border Padding="{DynamicResource ObjectViewerPadding}" Background="#1E1E1E">
-                    <TreeView ItemsSource="{Binding Items, RelativeSource={RelativeSource TemplatedParent}}"
+                <TreeView ItemsSource="{Binding Items, RelativeSource={RelativeSource TemplatedParent}}"
                               Background="Transparent">
+                        <TreeView.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel />
+                            </ItemsPanelTemplate>
+                        </TreeView.ItemsPanel>
                         <TreeView.Styles>
                             <Style Selector="TreeViewItem" x:DataType="dv:ObjectNode">
                                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
