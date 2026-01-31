@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -22,14 +23,14 @@ public class ObjectViewer : TemplatedControl
         AvaloniaProperty.Register<ObjectViewer, int>(nameof(MaxDepth), 10);
 
     /// <summary>
-    /// Defines the <see cref="RootNode"/> property.
+    /// Defines the <see cref="Items"/> property.
     /// </summary>
-    public static readonly DirectProperty<ObjectViewer, ObjectNode?> RootNodeProperty =
-        AvaloniaProperty.RegisterDirect<ObjectViewer, ObjectNode?>(
-            nameof(RootNode),
-            o => o.RootNode);
+    public static readonly DirectProperty<ObjectViewer, ObservableCollection<ObjectNode>> ItemsProperty =
+        AvaloniaProperty.RegisterDirect<ObjectViewer, ObservableCollection<ObjectNode>>(
+            nameof(Items),
+            o => o.Items);
 
-    private ObjectNode? _rootNode;
+    private ObservableCollection<ObjectNode> _items = [];
 
     /// <summary>
     /// Gets or sets the object to visualize.
@@ -50,12 +51,12 @@ public class ObjectViewer : TemplatedControl
     }
 
     /// <summary>
-    /// Gets the root node of the visualization tree.
+    /// Gets the collection of root nodes for the TreeView.
     /// </summary>
-    public ObjectNode? RootNode
+    public ObservableCollection<ObjectNode> Items
     {
-        get => _rootNode;
-        private set => SetAndRaise(RootNodeProperty, ref _rootNode, value);
+        get => _items;
+        private set => SetAndRaise(ItemsProperty, ref _items, value);
     }
 
     static ObjectViewer()
@@ -66,6 +67,10 @@ public class ObjectViewer : TemplatedControl
 
     private void OnValueChanged()
     {
-        RootNode = Value != null ? new ObjectNode(Value, null, MaxDepth) : null;
+        _items.Clear();
+        if (Value != null)
+        {
+            _items.Add(new ObjectNode(Value, null, MaxDepth));
+        }
     }
 }
