@@ -86,6 +86,30 @@ public partial class ObjectNode : ObservableObject
     public bool HasSourceLocation => StartLine.HasValue;
 
     /// <summary>
+    /// Gets a comma-delimited preview of the first 5 values for Object nodes.
+    /// </summary>
+    public string? ValuesPreview
+    {
+        get
+        {
+            if (Kind != NodeKind.Object || !HasChildren)
+                return null;
+
+            var previewValues = Children
+                .Take(5)
+                .Select(c => c.DisplayValue switch
+                {
+                    "" => c.TypeName,
+                    _ => c.DisplayValue
+                })
+                .Where(v => !string.IsNullOrEmpty(v));
+
+            var preview = string.Join(", ", previewValues);
+            return string.IsNullOrEmpty(preview) ? null : preview;
+        }
+    }
+
+    /// <summary>
     /// Gets the child nodes (lazily populated).
     /// </summary>
     public IReadOnlyList<ObjectNode> Children => _children ??= CreateChildren();

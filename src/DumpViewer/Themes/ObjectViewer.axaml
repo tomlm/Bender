@@ -87,6 +87,15 @@
                                                        IsVisible="{Binding HasChildren}"
                                                        Foreground="#4EC9B0"
                                                        Margin="{DynamicResource ObjectViewerItemSpacing}"/>
+
+                                            <!-- Values preview for object nodes -->
+                                            <TextBlock Text="{Binding ValuesPreview}"
+                                                       IsVisible="{Binding ValuesPreview, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                       Foreground="#808080"
+                                                       FontStyle="Italic"
+                                                       TextWrapping="NoWrap"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Margin="4,0,0,0"/>
                                             
                                             <!-- Display value with color based on kind -->
                                             <TextBlock Text="{Binding DisplayValue}"

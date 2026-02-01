@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -10,6 +6,11 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using AvaloniaEdit;
 using AvaloniaEdit.Document;
+using AvaloniaEdit.Editing;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace DumpViewer;
 
@@ -25,7 +26,7 @@ public class ObjectViewer : TemplatedControl
     private TextEditor? _textEditor;
     private bool _isSyncingFromTree;
     private bool _isSyncingFromEditor;
-    
+
     /// <summary>
     /// Defines the <see cref="Value"/> property.
     /// </summary>
@@ -152,7 +153,7 @@ public class ObjectViewer : TemplatedControl
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
     {
         base.OnApplyTemplate(e);
-        
+
         // Unsubscribe from old controls
         if (_searchTextBox != null)
         {
@@ -170,13 +171,13 @@ public class ObjectViewer : TemplatedControl
         {
             _textEditor.TextArea.Caret.PositionChanged -= OnEditorCaretPositionChanged;
         }
-        
+
         // Get new controls
         _searchTextBox = e.NameScope.Find<TextBox>("PART_SearchTextBox");
         _searchButton = e.NameScope.Find<Button>("PART_SearchButton");
         _treeView = e.NameScope.Find<TreeView>("PART_TreeView");
         _textEditor = e.NameScope.Find<TextEditor>("PART_TextEditor");
-        
+
         // Subscribe to events
         if (_searchTextBox != null)
         {
@@ -201,7 +202,7 @@ public class ObjectViewer : TemplatedControl
     private void ConfigureTextEditor()
     {
         if (_textEditor == null) return;
-        
+
         _textEditor.IsReadOnly = true;
         _textEditor.ShowLineNumbers = true;
         _textEditor.FontFamily = new FontFamily("Consolas, Monaco, 'Courier New', monospace");
@@ -213,7 +214,7 @@ public class ObjectViewer : TemplatedControl
     private void UpdateTextEditorContent()
     {
         if (_textEditor == null) return;
-        
+
         // Set text content using Document for proper rendering
         var text = SourceText ?? string.Empty;
         if (_textEditor.Document == null)
@@ -224,7 +225,7 @@ public class ObjectViewer : TemplatedControl
         {
             _textEditor.Document.Text = text;
         }
-        
+
         // Apply syntax highlighting
         var highlighting = SyntaxHighlightingManager.GetHighlightingForFormat(SyntaxHighlighting);
         if (_textEditor.SyntaxHighlighting != highlighting)
@@ -247,7 +248,7 @@ public class ObjectViewer : TemplatedControl
     private void OnEditorCaretPositionChanged(object? sender, EventArgs e)
     {
         if (_isSyncingFromTree || _textEditor == null) return;
-        
+
         _isSyncingFromEditor = true;
         try
         {
@@ -292,7 +293,7 @@ public class ObjectViewer : TemplatedControl
         {
             if (node == target)
                 return true;
-            
+
             if (node.Children.Contains(target) || ExpandAncestors(node.Children, target))
             {
                 node.IsExpanded = true;
@@ -311,7 +312,7 @@ public class ObjectViewer : TemplatedControl
     private void OnTreeViewSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_isSyncingFromEditor) return;
-        
+
         if (e.AddedItems.Count > 0 && e.AddedItems[0] is ObjectNode node)
         {
             SelectedNode = node;
@@ -338,28 +339,25 @@ public class ObjectViewer : TemplatedControl
         var startLine = SelectedNode.StartLine!.Value;
         var startCol = SelectedNode.StartColumn ?? 1;
         var endLine = SelectedNode.EndLine ?? startLine;
-        var endCol = SelectedNode.EndColumn ?? startCol;
+        var endCol = SelectedNode.EndColumn ?? 1;
 
         // Convert line/column to character offsets
-        var (startOffset, endOffset) = GetCharacterOffsets(SourceText, startLine, startCol, endLine, endCol);
-        
+        var (startOffset, endOffset) = GetCharacterOffsets(startLine, startCol, endLine, endCol);
+
         SelectedSourceRange = new SourceRange(startLine, startCol, endLine, endCol, startOffset, endOffset);
-        
+
         // Update the text editor selection and scroll into view
         if (_textEditor != null && startOffset >= 0)
         {
             _isSyncingFromTree = true;
             try
             {
-                // Select the text range
-                _textEditor.Select(startOffset, Math.Max(0, endOffset - startOffset));
-                
+
+//                _textEditor.TextArea.Selection = Selection.Create(_textEditor.TextArea, startOffset, endOffset);
+                _textEditor.TextArea.Caret.Offset = startOffset;
+
                 // Scroll to make the line visible
                 _textEditor.ScrollToLine(startLine);
-                
-                // Center the line in view
-                _textEditor.TextArea.Caret.Line = startLine;
-                _textEditor.TextArea.Caret.Column = startCol;
             }
             finally
             {
@@ -368,36 +366,9 @@ public class ObjectViewer : TemplatedControl
         }
     }
 
-    private static (int startOffset, int endOffset) GetCharacterOffsets(string text, int startLine, int startCol, int endLine, int endCol)
+    private (int startOffset, int endOffset) GetCharacterOffsets(int startLine, int startCol, int endLine, int endCol)
     {
-        int currentLine = 1;
-        int startOffset = -1;
-        int endOffset = -1;
-        int lineStart = 0;
-
-        for (int i = 0; i <= text.Length; i++)
-        {
-            if (currentLine == startLine && startOffset < 0)
-            {
-                startOffset = lineStart + Math.Max(0, startCol - 1);
-            }
-            if (currentLine == endLine && endOffset < 0)
-            {
-                endOffset = lineStart + Math.Max(0, endCol - 1);
-            }
-
-            if (i < text.Length && text[i] == '\n')
-            {
-                currentLine++;
-                lineStart = i + 1;
-            }
-        }
-
-        // If end wasn't found, use end of file
-        if (endOffset < 0) endOffset = text.Length;
-        if (startOffset < 0) startOffset = 0;
-
-        return (Math.Min(startOffset, text.Length), Math.Min(endOffset, text.Length));
+        return (_textEditor.Document.GetOffset(startLine, startCol), _textEditor.Document.GetOffset(endLine, endCol));
     }
 
     private void OnSearchTextBoxKeyDown(object? sender, KeyEventArgs e)
@@ -423,7 +394,7 @@ public class ObjectViewer : TemplatedControl
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        
+
         if (e.Key == Key.F && e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
             _searchTextBox?.Focus();
