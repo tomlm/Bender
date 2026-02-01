@@ -13,6 +13,7 @@
         <Thickness x:Key="ObjectViewerPadding">8</Thickness>
         <x:Double x:Key="ObjectViewerFontSize">13</x:Double>
         <Thickness x:Key="ObjectViewerItemSpacing">0,0,4,0</Thickness>
+        <x:Double x:Key="ObjectViewerRawPaneWidth">350</x:Double>
     </Styles.Resources>
 
     <!-- ObjectViewer template using TreeView -->
@@ -38,48 +39,102 @@
                                     Padding="12,6"/>
                         </Grid>
                         
-                        <TreeView ItemsSource="{Binding Items, RelativeSource={RelativeSource TemplatedParent}}"
-                              Background="Transparent">
-                        <TreeView.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <VirtualizingStackPanel />
-                            </ItemsPanelTemplate>
-                        </TreeView.ItemsPanel>
-                        <TreeView.Styles>
-                            <Style Selector="TreeViewItem" x:DataType="dv:ObjectNode">
-                                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
-                                <Setter Property="Foreground" Value="#D4D4D4"/>
-                                <Setter Property="FontFamily" Value="Consolas, Monaco, 'Courier New', monospace"/>
-                                <Setter Property="FontSize" Value="{DynamicResource ObjectViewerFontSize}"/>
-                            </Style>
-                        </TreeView.Styles>
-                        <TreeView.ItemTemplate>
-                            <TreeDataTemplate DataType="dv:ObjectNode" ItemsSource="{Binding Children}">
-                                <StackPanel Orientation="Horizontal">
-                                    <!-- Property name -->
-                                    <TextBlock Text="{Binding Name}"
-                                               IsVisible="{Binding Name, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                               Foreground="#9CDCFE"
-                                               Margin="{DynamicResource ObjectViewerItemSpacing}"/>
+                        <!-- Main content with optional raw text pane -->
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <!-- Tree View (left side) -->
+                            <TreeView Name="PART_TreeView"
+                                      Grid.Column="0"
+                                      ItemsSource="{Binding Items, RelativeSource={RelativeSource TemplatedParent}}"
+                                      Background="Transparent">
+                                <TreeView.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <VirtualizingStackPanel />
+                                    </ItemsPanelTemplate>
+                                </TreeView.ItemsPanel>
+                                <TreeView.Styles>
+                                    <Style Selector="TreeViewItem" x:DataType="dv:ObjectNode">
+                                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                                        <Setter Property="Foreground" Value="#D4D4D4"/>
+                                        <Setter Property="FontFamily" Value="Consolas, Monaco, 'Courier New', monospace"/>
+                                        <Setter Property="FontSize" Value="{DynamicResource ObjectViewerFontSize}"/>
+                                    </Style>
+                                </TreeView.Styles>
+                                <TreeView.ItemTemplate>
+                                    <TreeDataTemplate DataType="dv:ObjectNode" ItemsSource="{Binding Children}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <!-- Line number indicator -->
+                                            <TextBlock Text="{Binding StartLine, StringFormat='L{0}'}"
+                                                       IsVisible="{Binding HasSourceLocation}"
+                                                       Foreground="#6A9955"
+                                                       FontSize="10"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,0,6,0"
+                                                       Opacity="0.7"/>
+                                            
+                                            <!-- Property name -->
+                                            <TextBlock Text="{Binding Name}"
+                                                       IsVisible="{Binding Name, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                       Foreground="#9CDCFE"
+                                                       Margin="{DynamicResource ObjectViewerItemSpacing}"/>
+                                            
+                                            <TextBlock Text=": "
+                                                       IsVisible="{Binding Name, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                       Foreground="#D4D4D4"/>
+                                            
+                                            <!-- Type name for complex types -->
+                                            <TextBlock Text="{Binding TypeName}"
+                                                       IsVisible="{Binding HasChildren}"
+                                                       Foreground="#4EC9B0"
+                                                       Margin="{DynamicResource ObjectViewerItemSpacing}"/>
+                                            
+                                            <!-- Display value with color based on kind -->
+                                            <TextBlock Text="{Binding DisplayValue}"
+                                                       Foreground="{Binding Kind, Converter={x:Static dv:NodeKindToBrushConverter.Instance}}"
+                                                       FontStyle="{Binding Kind, Converter={x:Static dv:NodeKindToFontStyleConverter.Instance}}"/>
+                                        </StackPanel>
+                                    </TreeDataTemplate>
+                                </TreeView.ItemTemplate>
+                            </TreeView>
+                            
+                            <!-- Splitter -->
+                            <GridSplitter Grid.Column="1" 
+                                          Width="4" 
+                                          Background="#3F3F46"
+                                          IsVisible="{Binding SourceText, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                            
+                            <!-- Raw Text Pane (right side) -->
+                            <Border Grid.Column="2" 
+                                    Width="{DynamicResource ObjectViewerRawPaneWidth}"
+                                    Background="#252526"
+                                    BorderBrush="#3F3F46"
+                                    BorderThickness="1,0,0,0"
+                                    IsVisible="{Binding SourceText, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <DockPanel>
+                                    <!-- Header -->
+                                    <Border DockPanel.Dock="Top" 
+                                            Background="#2D2D2D" 
+                                            Padding="8,4">
+                                        <TextBlock Text="Source" 
+                                                   Foreground="#808080" 
+                                                   FontSize="11"/>
+                                    </Border>
                                     
-                                    <TextBlock Text=": "
-                                               IsVisible="{Binding Name, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                               Foreground="#D4D4D4"/>
-                                    
-                                    <!-- Type name for complex types -->
-                                    <TextBlock Text="{Binding TypeName}"
-                                               IsVisible="{Binding HasChildren}"
-                                               Foreground="#4EC9B0"
-                                               Margin="{DynamicResource ObjectViewerItemSpacing}"/>
-                                    
-                                    <!-- Display value with color based on kind -->
-                                    <TextBlock Text="{Binding DisplayValue}"
-                                               Foreground="{Binding Kind, Converter={x:Static dv:NodeKindToBrushConverter.Instance}}"
-                                               FontStyle="{Binding Kind, Converter={x:Static dv:NodeKindToFontStyleConverter.Instance}}"/>
-                                </StackPanel>
-                            </TreeDataTemplate>
-                        </TreeView.ItemTemplate>
-                    </TreeView>
+                                    <!-- Raw text content -->
+                                    <TextBox Name="PART_RawTextBox"
+                                             Text="{Binding SourceText, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
+                                             IsReadOnly="True"
+                                             AcceptsReturn="True"
+                                             TextWrapping="NoWrap"
+                                             FontFamily="Consolas, Monaco, 'Courier New', monospace"
+                                             FontSize="{DynamicResource ObjectViewerFontSize}"
+                                             Background="Transparent"
+                                             Foreground="#D4D4D4"
+                                             BorderThickness="0"
+                                             Padding="8"
+                                             CaretBrush="White"/>
+                                </DockPanel>
+                            </Border>
+                        </Grid>
                     </DockPanel>
                 </Border>
             </ControlTemplate>

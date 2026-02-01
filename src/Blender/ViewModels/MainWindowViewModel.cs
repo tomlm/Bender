@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using System.Xml;
 using Avalonia.Controls;
@@ -10,6 +9,8 @@ using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CsvHelper;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using ObjectSearch;
 using YamlDotNet.RepresentationModel;
 
@@ -232,16 +233,25 @@ public partial class MainWindowViewModel : ViewModelBase
         return Task.FromResult(true);
     }
 
+
     private static object? DeserializeData(string data, DataFormat format)
     {
         return format switch
         {
-            DataFormat.Json => JsonNode.Parse(data),
+            DataFormat.Json => ParseJson(data),
             DataFormat.Xml => ParseXml(data),
             DataFormat.Yaml => ParseYaml(data),
             DataFormat.Csv => ParseCsv(data),
             _ => null
         };
+    }
+
+    private static JToken ParseJson(string data)
+    {
+        // Use JsonTextReader with LineInfo to preserve line numbers
+        using var stringReader = new StringReader(data);
+        using var jsonReader = new JsonTextReader(stringReader);
+        return JToken.Load(jsonReader, new JsonLoadSettings { LineInfoHandling = LineInfoHandling.Load });
     }
 
     private static XmlDocument ParseXml(string data)

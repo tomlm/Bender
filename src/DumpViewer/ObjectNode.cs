@@ -4,9 +4,10 @@ using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json.Nodes;
 using System.Xml;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using YamlDotNet.RepresentationModel;
 
 namespace DumpViewer;
@@ -60,6 +61,31 @@ public partial class ObjectNode : ObservableObject
     public bool IsExpandable => HasChildren;
 
     /// <summary>
+    /// Gets the start line number in the source text (1-based), or null if not available.
+    /// </summary>
+    public int? StartLine { get; }
+
+    /// <summary>
+    /// Gets the start column in the source text (1-based), or null if not available.
+    /// </summary>
+    public int? StartColumn { get; }
+
+    /// <summary>
+    /// Gets the end line number in the source text (1-based), or null if not available.
+    /// </summary>
+    public int? EndLine { get; }
+
+    /// <summary>
+    /// Gets the end column in the source text (1-based), or null if not available.
+    /// </summary>
+    public int? EndColumn { get; }
+
+    /// <summary>
+    /// Gets whether this node has source location information.
+    /// </summary>
+    public bool HasSourceLocation => StartLine.HasValue;
+
+    /// <summary>
     /// Gets the child nodes (lazily populated).
     /// </summary>
     public IReadOnlyList<ObjectNode> Children => _children ??= CreateChildren();
@@ -70,7 +96,7 @@ public partial class ObjectNode : ObservableObject
     private readonly HashSet<object> _visited;
     private readonly string? _inferredItemTypeName;
 
-    public ObjectNode(object? value, string? name = null, int maxDepth = 10, int currentDepth = 0, HashSet<object>? visited = null, string? inferredItemTypeName = null)
+    public ObjectNode(object? value, string? name = null, int maxDepth = 10, int currentDepth = 0, HashSet<object>? visited = null, string? inferredItemTypeName = null, int? overrideStartLine = null)
     {
         _maxDepth = maxDepth;
         _currentDepth = currentDepth;
@@ -82,9 +108,48 @@ public partial class ObjectNode : ObservableObject
         ValueType = value?.GetType();
 
         (Kind, DisplayValue, TypeName, HasChildren) = AnalyzeValue(value);
+        
+        // Use override line if provided (e.g., for CSV rows), otherwise extract from value
+        if (overrideStartLine.HasValue)
+        {
+            StartLine = overrideStartLine.Value;
+            StartColumn = 1;
+            EndLine = overrideStartLine.Value;
+            EndColumn = null;
+        }
+        else
+        {
+            (StartLine, StartColumn, EndLine, EndColumn) = ExtractSourceLocation(value);
+        }
 
         // Auto-expand first level
         IsExpanded = currentDepth == 0;
+    }
+
+
+
+
+    private static (int? startLine, int? startColumn, int? endLine, int? endColumn) ExtractSourceLocation(object? value)
+    {
+        // JSON tokens (Newtonsoft.Json) implement IJsonLineInfo
+        if (value is JToken jToken && jToken is IJsonLineInfo jsonLineInfo && jsonLineInfo.HasLineInfo())
+        {
+            return (jsonLineInfo.LineNumber, jsonLineInfo.LinePosition, null, null);
+        }
+        
+        // YAML nodes have Start and End marks
+        if (value is YamlNode yamlNode)
+        {
+            return ((int)yamlNode.Start.Line, (int)yamlNode.Start.Column, (int)yamlNode.End.Line, (int)yamlNode.End.Column);
+        }
+        
+        // XML nodes can provide line info via IXmlLineInfo
+        if (value is XmlNode xmlNode && xmlNode is System.Xml.IXmlLineInfo lineInfo && lineInfo.HasLineInfo())
+        {
+            return (lineInfo.LineNumber, lineInfo.LinePosition, null, null);
+        }
+        
+        return (null, null, null, null);
     }
 
     private (NodeKind kind, string displayValue, string typeName, bool hasChildren) AnalyzeValue(object? value)
@@ -93,6 +158,9 @@ public partial class ObjectNode : ObservableObject
         {
             return (NodeKind.Null, "null", "", false);
         }
+
+
+
 
         var type = value.GetType();
         var typeName = GetFriendlyTypeName(type);
@@ -111,19 +179,19 @@ public partial class ObjectNode : ObservableObject
 
         // === Special data format handling ===
 
-        // JSON nodes (System.Text.Json)
-        if (value is JsonValue jsonValue)
+        // JSON tokens (Newtonsoft.Json)
+        if (value is JValue jValue)
         {
-            return AnalyzeJsonValue(jsonValue);
+            return AnalyzeJValue(jValue);
         }
-        if (value is JsonObject jsonObj)
+        if (value is JObject jObj)
         {
             var objTypeName = _inferredItemTypeName ?? "Object";
-            return (NodeKind.Object, "", objTypeName, jsonObj.Count > 0);
+            return (NodeKind.Object, "", objTypeName, jObj.Count > 0);
         }
-        if (value is JsonArray jsonArr)
+        if (value is JArray jArr)
         {
-            return (NodeKind.Collection, $"({jsonArr.Count} items)", "Array", jsonArr.Count > 0);
+            return (NodeKind.Collection, $"({jArr.Count} items)", "Array", jArr.Count > 0);
         }
 
         // YAML nodes
@@ -269,17 +337,20 @@ public partial class ObjectNode : ObservableObject
         return (NodeKind.Object, "", typeName, properties.Length > 0);
     }
 
-    private static (NodeKind kind, string displayValue, string typeName, bool hasChildren) AnalyzeJsonValue(JsonValue jsonValue)
+    private static (NodeKind kind, string displayValue, string typeName, bool hasChildren) AnalyzeJValue(JValue jValue)
     {
-        var element = jsonValue.GetValue<System.Text.Json.JsonElement>();
-        return element.ValueKind switch
+        return jValue.Type switch
         {
-            System.Text.Json.JsonValueKind.String => (NodeKind.String, $"\"{EscapeString(element.GetString() ?? "")}\"", "string", false),
-            System.Text.Json.JsonValueKind.Number => (NodeKind.Primitive, element.GetRawText(), "number", false),
-            System.Text.Json.JsonValueKind.True => (NodeKind.Primitive, "true", "boolean", false),
-            System.Text.Json.JsonValueKind.False => (NodeKind.Primitive, "false", "boolean", false),
-            System.Text.Json.JsonValueKind.Null => (NodeKind.Null, "null", "", false),
-            _ => (NodeKind.String, element.GetRawText(), "unknown", false)
+            JTokenType.String => (NodeKind.String, $"\"{EscapeString(jValue.Value?.ToString() ?? "")}\"", "string", false),
+            JTokenType.Integer => (NodeKind.Primitive, jValue.Value?.ToString() ?? "0", "number", false),
+            JTokenType.Float => (NodeKind.Primitive, jValue.Value?.ToString() ?? "0", "number", false),
+            JTokenType.Boolean => (NodeKind.Primitive, jValue.Value?.ToString()?.ToLowerInvariant() ?? "false", "boolean", false),
+            JTokenType.Null => (NodeKind.Null, "null", "", false),
+            JTokenType.Date => (NodeKind.DateTime, jValue.Value?.ToString() ?? "", "DateTime", false),
+            JTokenType.Guid => (NodeKind.Guid, jValue.Value?.ToString() ?? "", "Guid", false),
+            JTokenType.TimeSpan => (NodeKind.TimeSpan, jValue.Value?.ToString() ?? "", "TimeSpan", false),
+            JTokenType.Uri => (NodeKind.String, $"\"{EscapeString(jValue.Value?.ToString() ?? "")}\"", "Uri", false),
+            _ => (NodeKind.String, jValue.Value?.ToString() ?? "", "unknown", false)
         };
     }
 
@@ -310,6 +381,7 @@ public partial class ObjectNode : ObservableObject
 
         var type = Value.GetType();
 
+
         // Track this object to detect circular references
         var newVisited = new HashSet<object>(_visited, ReferenceEqualityComparer.Instance);
         if (!type.IsValueType)
@@ -321,23 +393,23 @@ public partial class ObjectNode : ObservableObject
 
         // === Special data format handling ===
 
-        // JSON Object
-        if (Value is JsonObject jsonObj)
+        // JSON Object (Newtonsoft.Json)
+        if (Value is JObject jObj)
         {
-            foreach (var prop in jsonObj.OrderBy(p => p.Key))
+            foreach (var prop in jObj.Properties().OrderBy(p => p.Name))
             {
                 // Infer item type name if the value is an array
-                string? itemTypeName = prop.Value is JsonArray ? Singularize(prop.Key) : null;
-                children.Add(new ObjectNode(prop.Value, prop.Key, _maxDepth, _currentDepth + 1, newVisited, itemTypeName));
+                string? itemTypeName = prop.Value is JArray ? Singularize(prop.Name) : null;
+                children.Add(new ObjectNode(prop.Value, prop.Name, _maxDepth, _currentDepth + 1, newVisited, itemTypeName));
             }
             return children;
         }
 
-        // JSON Array
-        if (Value is JsonArray jsonArr)
+        // JSON Array (Newtonsoft.Json)
+        if (Value is JArray jArr)
         {
             int index = 0;
-            foreach (var item in jsonArr)
+            foreach (var item in jArr)
             {
                 children.Add(new ObjectNode(item, $"[{index}]", _maxDepth, _currentDepth + 1, newVisited, _inferredItemTypeName));
                 index++;
@@ -461,6 +533,7 @@ public partial class ObjectNode : ObservableObject
 
         // === Standard type handling ===
 
+
         // Dictionary
         if (Value is IDictionary dict)
         {
@@ -478,17 +551,21 @@ public partial class ObjectNode : ObservableObject
             int index = 0;
             foreach (var item in enumerable)
             {
-                // For dynamic objects (CSV rows), infer "Row" as the type name if not already set
+                // For dynamic objects (CSV rows), infer "Row" as the type name and calculate line number
                 var itemTypeName = _inferredItemTypeName;
-                if (itemTypeName == null && item != null)
+                int? csvLineNumber = null;
+                
+                if (item != null)
                 {
                     var itemType = item.GetType();
                     if (item is ExpandoObject || (item is IDictionary<string, object> && IsDynamicObject(itemType)))
                     {
-                        itemTypeName = "Row";
+                        if (itemTypeName == null) itemTypeName = "Row";
+                        // CSV line = index + 2 (1 for header row, 1 for 1-based line numbers)
+                        csvLineNumber = index + 2;
                     }
                 }
-                children.Add(new ObjectNode(item, $"[{index}]", _maxDepth, _currentDepth + 1, newVisited, itemTypeName));
+                children.Add(new ObjectNode(item, $"[{index}]", _maxDepth, _currentDepth + 1, newVisited, itemTypeName, csvLineNumber));
                 index++;
             }
             return children;
