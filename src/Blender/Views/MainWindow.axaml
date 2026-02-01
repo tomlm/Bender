@@ -80,7 +80,9 @@
         </ScrollViewer>
         
         <!-- Object viewer -->
-        <dv:ObjectViewer Value="{Binding Data}" SourceText="{Binding InputData}">
+        <dv:ObjectViewer Value="{Binding Data}" 
+                         SourceText="{Binding InputData}"
+                         SyntaxHighlighting="{Binding FormatName}">
             <dv:ObjectViewer.IsVisible>
                 <MultiBinding Converter="{x:Static BoolConverters.And}">
                     <Binding Path="IsObjectsView"/>

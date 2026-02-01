@@ -63,8 +63,21 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     public bool HasData => Data != null || !string.IsNullOrEmpty(InputData);
 
+    /// <summary>
+    /// Gets the format name as a string for syntax highlighting.
+    /// </summary>
+    public string? FormatName => Format switch
+    {
+        DataFormat.Json => "json",
+        DataFormat.Yaml => "yaml",
+        DataFormat.Xml => "xml",
+        DataFormat.Csv => "csv",
+        _ => null
+    };
+
     partial void OnDataChanged(object? value) => OnPropertyChanged(nameof(HasData));
     partial void OnInputDataChanged(string? value) => OnPropertyChanged(nameof(HasData));
+    partial void OnFormatChanged(DataFormat value) => OnPropertyChanged(nameof(FormatName));
 
     /// <summary>
     /// Gets or sets the current view mode.

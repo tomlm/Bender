@@ -1,6 +1,7 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:dv="using:DumpViewer">
+        xmlns:dv="using:DumpViewer"
+        xmlns:ae="using:AvaloniaEdit">
 
     <Design.PreviewWith>
         <Border Padding="20" Background="#1E1E1E">
@@ -13,7 +14,7 @@
         <Thickness x:Key="ObjectViewerPadding">8</Thickness>
         <x:Double x:Key="ObjectViewerFontSize">13</x:Double>
         <Thickness x:Key="ObjectViewerItemSpacing">0,0,4,0</Thickness>
-        <x:Double x:Key="ObjectViewerRawPaneWidth">350</x:Double>
+        <x:Double x:Key="ObjectViewerRawPaneWidth">400</x:Double>
     </Styles.Resources>
 
     <!-- ObjectViewer template using TreeView -->
@@ -40,7 +41,7 @@
                         </Grid>
                         
                         <!-- Main content with optional raw text pane -->
-                        <Grid ColumnDefinitions="*,Auto,Auto">
+                        <Grid ColumnDefinitions="*,Auto,400">
                             <!-- Tree View (left side) -->
                             <TreeView Name="PART_TreeView"
                                       Grid.Column="0"
@@ -102,10 +103,10 @@
                                           Background="#3F3F46"
                                           IsVisible="{Binding SourceText, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                             
-                            <!-- Raw Text Pane (right side) -->
+                            <!-- Raw Text Pane (right side) with AvaloniaEdit -->
                             <Border Grid.Column="2" 
-                                    Width="{DynamicResource ObjectViewerRawPaneWidth}"
-                                    Background="#252526"
+                                    MinWidth="200"
+                                    Background="#1E1E1E"
                                     BorderBrush="#3F3F46"
                                     BorderThickness="1,0,0,0"
                                     IsVisible="{Binding SourceText, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
@@ -119,19 +120,17 @@
                                                    FontSize="11"/>
                                     </Border>
                                     
-                                    <!-- Raw text content -->
-                                    <TextBox Name="PART_RawTextBox"
-                                             Text="{Binding SourceText, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
-                                             IsReadOnly="True"
-                                             AcceptsReturn="True"
-                                             TextWrapping="NoWrap"
-                                             FontFamily="Consolas, Monaco, 'Courier New', monospace"
-                                             FontSize="{DynamicResource ObjectViewerFontSize}"
-                                             Background="Transparent"
-                                             Foreground="#D4D4D4"
-                                             BorderThickness="0"
-                                             Padding="8"
-                                             CaretBrush="White"/>
+                                    <!-- AvaloniaEdit TextEditor -->
+                                    <ae:TextEditor Name="PART_TextEditor"
+                                                   IsReadOnly="True"
+                                                   ShowLineNumbers="True"
+                                                   FontFamily="Consolas, Monaco, 'Courier New', monospace"
+                                                   FontSize="{DynamicResource ObjectViewerFontSize}"
+                                                   Background="#1E1E1E"
+                                                   Foreground="#D4D4D4"
+                                                   LineNumbersForeground="#858585"
+                                                   HorizontalScrollBarVisibility="Auto"
+                                                   VerticalScrollBarVisibility="Auto"/>
                                 </DockPanel>
                             </Border>
                         </Grid>
