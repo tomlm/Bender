@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
@@ -121,7 +122,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
 
         var storageProvider = Window.StorageProvider;
-        
+
         var files = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Open Data File",
@@ -167,7 +168,8 @@ public partial class MainWindowViewModel : ViewModelBase
             ErrorMessage = $"File not found: {filePath}";
             return false;
         }
-
+        Stopwatch sw = new Stopwatch();
+        sw.Start();
         try
         {
             InputData = await File.ReadAllTextAsync(filePath);
@@ -178,7 +180,8 @@ public partial class MainWindowViewModel : ViewModelBase
             ErrorMessage = $"Error reading file: {ex.Message}";
             return false;
         }
-
+        sw.Stop();
+        Debug.WriteLine($"File read in {sw.ElapsedMilliseconds} ms");
         return await ParseAndDeserializeAsync();
     }
 
@@ -222,28 +225,39 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private Task<bool> ParseAndDeserializeAsync()
     {
-        // Auto-detect format if not specified
-        if (Format == DataFormat.Auto && !string.IsNullOrEmpty(InputData))
+        Stopwatch sw = new Stopwatch();
+        sw.Start();
+        try
         {
-            Format = DetectFormat(InputData, FilePath);
-        }
 
-        // Deserialize the input data based on format
-        if (!string.IsNullOrEmpty(InputData) && Format != DataFormat.Auto)
+            // Auto-detect format if not specified
+            if (Format == DataFormat.Auto && !string.IsNullOrEmpty(InputData))
+            {
+                Format = DetectFormat(InputData, FilePath);
+            }
+
+            // Deserialize the input data based on format
+            if (!string.IsNullOrEmpty(InputData) && Format != DataFormat.Auto)
+            {
+                try
+                {
+                    Data = DeserializeData(InputData, Format);
+                }
+                catch (Exception ex)
+                {
+                    HasError = true;
+                    ErrorMessage = $"Error deserializing {Format} data: {ex.Message}";
+                    return Task.FromResult(false);
+                }
+            }
+
+            return Task.FromResult(true);
+        }
+        finally
         {
-            try
-            {
-                Data = DeserializeData(InputData, Format);
-            }
-            catch (Exception ex)
-            {
-                HasError = true;
-                ErrorMessage = $"Error deserializing {Format} data: {ex.Message}";
-                return Task.FromResult(false);
-            }
+            sw.Stop();
+            Debug.WriteLine($"Data parsed and deserialized in {sw.ElapsedMilliseconds} ms");
         }
-
-        return Task.FromResult(true);
     }
 
 

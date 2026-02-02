@@ -87,6 +87,7 @@ public partial class ObjectNode : ObservableObject
 
     /// <summary>
     /// Gets a comma-delimited preview of the first 5 values for Object nodes.
+    /// Only provides preview if children are already loaded to avoid triggering expensive child creation.
     /// </summary>
     public string? ValuesPreview
     {
@@ -95,7 +96,11 @@ public partial class ObjectNode : ObservableObject
             if (Kind != NodeKind.Object || !HasChildren)
                 return null;
 
-            var previewValues = Children
+            // Don't trigger child creation just for preview - only show if already loaded
+            if (_children == null)
+                return null;
+
+            var previewValues = _children
                 .Take(5)
                 .Select(c => c.DisplayValue switch
                 {
@@ -113,6 +118,71 @@ public partial class ObjectNode : ObservableObject
     /// Gets the child nodes (lazily populated).
     /// </summary>
     public IReadOnlyList<ObjectNode> Children => _children ??= CreateChildren();
+
+    /// <summary>
+    /// Gets the count of children without materializing them if possible.
+    /// Falls back to accessing Children.Count if no optimized count is available.
+    /// </summary>
+    public int ChildCount
+    {
+        get
+        {
+            // If children are already created, use their count
+            if (_children != null)
+                return _children.Count;
+
+            // Try to get count from underlying value without creating ObjectNode children
+            var fastCount = GetChildCountFromValue();
+            if (fastCount.HasValue)
+                return fastCount.Value;
+            
+            // For unknown types, return 0 rather than triggering full Children creation
+            // This is safer for virtualization - we'll create children when actually accessed
+            return HasChildren ? 1 : 0; // Assume at least 1 if HasChildren is true
+        }
+    }
+
+    /// <summary>
+    /// Gets the child count directly from the underlying value if possible.
+    /// Returns null if we need to fall back to creating children.
+    /// </summary>
+    private int? GetChildCountFromValue()
+    {
+        if (Value == null || !HasChildren)
+            return 0;
+
+        // JSON
+        if (Value is JObject jObj) return jObj.Count;
+        if (Value is JArray jArr) return jArr.Count;
+
+        // YAML
+        if (Value is YamlMappingNode yamlMap) return yamlMap.Children.Count;
+        if (Value is YamlSequenceNode yamlSeq) return yamlSeq.Children.Count;
+        if (Value is YamlStream yamlStream) return yamlStream.Documents.Count;
+        if (Value is YamlDocument yamlDoc) return yamlDoc.RootNode != null ? 1 : 0;
+
+        // XML
+        if (Value is XmlDocument xmlDoc) return xmlDoc.DocumentElement != null ? 1 : 0;
+        if (Value is XmlElement xmlElement)
+        {
+            int count = xmlElement.Attributes?.Count ?? 0;
+            count += xmlElement.ChildNodes.Cast<XmlNode>().Count(n => n is XmlElement);
+            return count;
+        }
+
+        // ExpandoObject / dynamic
+        if (Value is System.Dynamic.ExpandoObject expando)
+            return ((IDictionary<string, object?>)expando).Count;
+        if (Value is IDictionary<string, object> dynamicDict && IsDynamicObject(Value.GetType()))
+            return dynamicDict.Count;
+
+        // Generic collections - try to get count without full enumeration
+        if (Value is System.Collections.ICollection collection)
+            return collection.Count;
+
+        // Fall back to null - will create children
+        return null;
+    }
 
     private IReadOnlyList<ObjectNode>? _children;
     private readonly int _maxDepth;
@@ -146,8 +216,10 @@ public partial class ObjectNode : ObservableObject
             (StartLine, StartColumn, EndLine, EndColumn) = ExtractSourceLocation(value);
         }
 
-        // Auto-expand first level
-        IsExpanded = currentDepth == 0;
+        // Auto-expand first level, but not if it has too many children (performance)
+        // Large collections should be manually expanded
+        const int AutoExpandThreshold = 100;
+        IsExpanded = currentDepth == 0 && (!HasChildren || ChildCount <= AutoExpandThreshold);
     }
 
 

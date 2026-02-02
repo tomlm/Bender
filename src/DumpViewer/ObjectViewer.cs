@@ -6,10 +6,9 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using AvaloniaEdit;
 using AvaloniaEdit.Document;
-using AvaloniaEdit.Editing;
+using AvaloniaEdit.Highlighting;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 
 namespace DumpViewer;
@@ -17,12 +16,13 @@ namespace DumpViewer;
 
 /// <summary>
 /// A control that visualizes any object in a tree structure similar to LinqPad's .Dump().
+/// Uses a flat virtualized list for efficient handling of large datasets (400k+ items).
 /// </summary>
 public class ObjectViewer : TemplatedControl
 {
     private TextBox? _searchTextBox;
     private Button? _searchButton;
-    private TreeView? _treeView;
+    private ListBox? _listBox;
     private TextEditor? _textEditor;
     private bool _isSyncingFromTree;
     private bool _isSyncingFromEditor;
@@ -58,12 +58,12 @@ public class ObjectViewer : TemplatedControl
         AvaloniaProperty.Register<ObjectViewer, ObjectNode?>(nameof(SelectedNode));
 
     /// <summary>
-    /// Defines the <see cref="Items"/> property.
+    /// Defines the <see cref="FlattenedItems"/> property for the virtualized collection.
     /// </summary>
-    public static readonly DirectProperty<ObjectViewer, ObservableCollection<ObjectNode>> ItemsProperty =
-        AvaloniaProperty.RegisterDirect<ObjectViewer, ObservableCollection<ObjectNode>>(
-            nameof(Items),
-            o => o.Items);
+    public static readonly DirectProperty<ObjectViewer, VirtualizedObjectCollection> FlattenedItemsProperty =
+        AvaloniaProperty.RegisterDirect<ObjectViewer, VirtualizedObjectCollection>(
+            nameof(FlattenedItems),
+            o => o.FlattenedItems);
 
     /// <summary>
     /// Defines the <see cref="SelectedSourceRange"/> property.
@@ -73,7 +73,7 @@ public class ObjectViewer : TemplatedControl
             nameof(SelectedSourceRange),
             o => o.SelectedSourceRange);
 
-    private ObservableCollection<ObjectNode> _items = [];
+    private readonly VirtualizedObjectCollection _flattenedItems = new();
     private SourceRange? _selectedSourceRange;
 
     /// <summary>
@@ -131,13 +131,9 @@ public class ObjectViewer : TemplatedControl
     }
 
     /// <summary>
-    /// Gets the collection of root nodes for the TreeView.
+    /// Gets the virtualized flattened collection of nodes.
     /// </summary>
-    public ObservableCollection<ObjectNode> Items
-    {
-        get => _items;
-        private set => SetAndRaise(ItemsProperty, ref _items, value);
-    }
+    public VirtualizedObjectCollection FlattenedItems => _flattenedItems;
 
 
     static ObjectViewer()
@@ -163,9 +159,10 @@ public class ObjectViewer : TemplatedControl
         {
             _searchButton.Click -= OnSearchButtonClick;
         }
-        if (_treeView != null)
+        if (_listBox != null)
         {
-            _treeView.SelectionChanged -= OnTreeViewSelectionChanged;
+            _listBox.SelectionChanged -= OnListBoxSelectionChanged;
+            _listBox.DoubleTapped -= OnListBoxDoubleTapped;
         }
         if (_textEditor != null)
         {
@@ -175,7 +172,7 @@ public class ObjectViewer : TemplatedControl
         // Get new controls
         _searchTextBox = e.NameScope.Find<TextBox>("PART_SearchTextBox");
         _searchButton = e.NameScope.Find<Button>("PART_SearchButton");
-        _treeView = e.NameScope.Find<TreeView>("PART_TreeView");
+        _listBox = e.NameScope.Find<ListBox>("PART_ListBox");
         _textEditor = e.NameScope.Find<TextEditor>("PART_TextEditor");
 
         // Subscribe to events
@@ -187,9 +184,10 @@ public class ObjectViewer : TemplatedControl
         {
             _searchButton.Click += OnSearchButtonClick;
         }
-        if (_treeView != null)
+        if (_listBox != null)
         {
-            _treeView.SelectionChanged += OnTreeViewSelectionChanged;
+            _listBox.SelectionChanged += OnListBoxSelectionChanged;
+            _listBox.DoubleTapped += OnListBoxDoubleTapped;
         }
         if (_textEditor != null)
         {
@@ -197,6 +195,35 @@ public class ObjectViewer : TemplatedControl
             ConfigureTextEditor();
             UpdateTextEditorContent();
         }
+    }
+
+    private void OnListBoxDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        // Toggle expand/collapse on double-click
+        if (_listBox?.SelectedItem is FlattenedNode flatNode && flatNode.CanExpand)
+        {
+            flatNode.Node.IsExpanded = !flatNode.Node.IsExpanded;
+            _flattenedItems.OnNodeExpandedChanged(flatNode.Node);
+        }
+    }
+
+    private void OnListBoxSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_isSyncingFromEditor) return;
+
+        if (e.AddedItems.Count > 0 && e.AddedItems[0] is FlattenedNode flatNode)
+        {
+            SelectedNode = flatNode.Node;
+        }
+    }
+
+    /// <summary>
+    /// Toggles the expanded state of a node.
+    /// </summary>
+    public void ToggleNode(ObjectNode node)
+    {
+        node.IsExpanded = !node.IsExpanded;
+        _flattenedItems.OnNodeExpandedChanged(node);
     }
 
     private void ConfigureTextEditor()
@@ -211,27 +238,154 @@ public class ObjectViewer : TemplatedControl
         _textEditor.Foreground = new SolidColorBrush(Color.Parse("#D4D4D4"));
     }
 
+
+
+
+
+
     private void UpdateTextEditorContent()
     {
         if (_textEditor == null) return;
 
-        // Set text content using Document for proper rendering
-        var text = SourceText ?? string.Empty;
-        if (_textEditor.Document == null)
+        // Suppress caret position changed events while updating document
+        // to avoid expensive FindNodeAtLine calls during document swap
+        _isSyncingFromTree = true;
+        try
         {
+            // Set text content using Document for proper rendering
+            var text = SourceText ?? string.Empty;
+            
+            // Check for very long lines that would cause rendering issues
+            // AvaloniaEdit struggles with lines that are millions of characters
+            text = EnsureReasonableLineLength(text);
+            
+            System.Diagnostics.Debug.WriteLine($"[ObjectViewer] Setting document text: {text.Length} chars, {text.Split('\n').Length} lines");
+            
+            // Always create a fresh document to avoid rendering issues
             _textEditor.Document = new TextDocument(text);
-        }
-        else if (_textEditor.Document.Text != text)
-        {
-            _textEditor.Document.Text = text;
-        }
+            
+            System.Diagnostics.Debug.WriteLine($"[ObjectViewer] Document created: LineCount={_textEditor.Document.LineCount}");
 
-        // Apply syntax highlighting
-        var highlighting = SyntaxHighlightingManager.GetHighlightingForFormat(SyntaxHighlighting);
-        if (_textEditor.SyntaxHighlighting != highlighting)
-        {
-            _textEditor.SyntaxHighlighting = highlighting;
+            // Apply syntax highlighting only for reasonably sized files
+            // Large files cause regex-based highlighting to hang
+            const int MaxHighlightingLength = 500_000; // 500KB max for syntax highlighting
+            IHighlightingDefinition? highlighting = null;
+            
+            if (text.Length <= MaxHighlightingLength)
+            {
+                highlighting = SyntaxHighlightingManager.GetHighlightingForFormat(SyntaxHighlighting);
+            }
+            
+            if (_textEditor.SyntaxHighlighting != highlighting)
+            {
+                _textEditor.SyntaxHighlighting = highlighting;
+            }
         }
+        finally
+        {
+            _isSyncingFromTree = false;
+        }
+    }
+
+    /// <summary>
+    /// Ensures no single line exceeds a reasonable length for rendering.
+    /// For XML/JSON, attempts to format. For other content, truncates long lines.
+    /// </summary>
+    private string EnsureReasonableLineLength(string text)
+    {
+        const int MaxLineLength = 10_000; // 10K chars max per line
+        const int MaxTotalLength = 10_000_000; // 10MB max total
+        
+        // Quick check - if text is small, no need to process
+        if (text.Length <= MaxLineLength)
+            return text;
+        
+        // Check if any line exceeds the max
+        var lines = text.Split('\n');
+        bool hasLongLine = false;
+        foreach (var line in lines)
+        {
+            if (line.Length > MaxLineLength)
+            {
+                hasLongLine = true;
+                break;
+            }
+        }
+        
+        if (!hasLongLine)
+            return text;
+        
+        // Try to format XML if it looks like XML
+        if (SyntaxHighlighting == "xml" && text.TrimStart().StartsWith('<'))
+        {
+            try
+            {
+                var doc = new System.Xml.XmlDocument();
+                doc.LoadXml(text);
+                
+                using var sw = new System.IO.StringWriter();
+                using var xw = new System.Xml.XmlTextWriter(sw);
+                xw.Formatting = System.Xml.Formatting.Indented;
+                xw.Indentation = 2;
+                doc.WriteTo(xw);
+                
+                var formatted = sw.ToString();
+                
+                // Only use formatted if it's not too large
+                if (formatted.Length <= MaxTotalLength)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ObjectViewer] Formatted XML: {text.Length} -> {formatted.Length} chars");
+                    return formatted;
+                }
+            }
+            catch
+            {
+                // If formatting fails, fall through to truncation
+            }
+        }
+        
+        // Try to format JSON if it looks like JSON
+        if (SyntaxHighlighting == "json" && (text.TrimStart().StartsWith('{') || text.TrimStart().StartsWith('[')))
+        {
+            try
+            {
+                var obj = Newtonsoft.Json.Linq.JToken.Parse(text);
+                var formatted = obj.ToString(Newtonsoft.Json.Formatting.Indented);
+                
+                if (formatted.Length <= MaxTotalLength)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ObjectViewer] Formatted JSON: {text.Length} -> {formatted.Length} chars");
+                    return formatted;
+                }
+            }
+            catch
+            {
+                // If formatting fails, fall through to truncation
+            }
+        }
+        
+        // If formatting didn't work, truncate long lines
+        var result = new System.Text.StringBuilder();
+        foreach (var line in lines)
+        {
+            if (line.Length > MaxLineLength)
+            {
+                result.AppendLine(line.Substring(0, MaxLineLength) + "... (line truncated)");
+            }
+            else
+            {
+                result.AppendLine(line);
+            }
+            
+            // Stop if result is too large
+            if (result.Length > MaxTotalLength)
+            {
+                result.AppendLine("\n... (content truncated for display)");
+                break;
+            }
+        }
+        
+        return result.ToString();
     }
 
     private void OnSourceTextChanged()
@@ -253,12 +407,12 @@ public class ObjectViewer : TemplatedControl
         try
         {
             var line = _textEditor.TextArea.Caret.Line;
-            var node = FindNodeAtLine(Items, line);
+            var node = FindNodeAtLine(line);
             if (node != null && node != SelectedNode)
             {
                 SelectedNode = node;
                 ExpandToNode(node);
-                SelectNodeInTree(node);
+                SelectNodeInListBox(node);
             }
         }
         finally
@@ -267,55 +421,60 @@ public class ObjectViewer : TemplatedControl
         }
     }
 
-    private ObjectNode? FindNodeAtLine(IEnumerable<ObjectNode> nodes, int line)
+    private ObjectNode? FindNodeAtLine(int line)
     {
-        foreach (var node in nodes)
-        {
-            if (node.HasSourceLocation && node.StartLine <= line && (node.EndLine ?? node.StartLine) >= line)
-            {
-                // Check children for a more specific match
-                var childMatch = FindNodeAtLine(node.Children, line);
-                return childMatch ?? node;
-            }
-        }
-        return null;
+        // Search through the root nodes recursively (not through the virtualized collection)
+        // This avoids O(n²) behavior when iterating through a large virtualized list
+        return _flattenedItems.FindNodeByLine(line);
     }
 
     private void ExpandToNode(ObjectNode targetNode)
     {
-        // Expand all ancestors
-        ExpandAncestors(Items, targetNode);
+        // Expand all ancestors - we need to search from roots
+        bool changed = false;
+        foreach (var flatNode in _flattenedItems)
+        {
+            if (ExpandAncestorsRecursive(flatNode.Node, targetNode, ref changed))
+                break;
+        }
+        if (changed)
+        {
+            _flattenedItems.InvalidateAndNotify();
+        }
     }
 
-    private bool ExpandAncestors(IEnumerable<ObjectNode> nodes, ObjectNode target)
+    private bool ExpandAncestorsRecursive(ObjectNode current, ObjectNode target, ref bool changed)
     {
-        foreach (var node in nodes)
-        {
-            if (node == target)
-                return true;
+        if (current == target)
+            return true;
 
-            if (node.Children.Contains(target) || ExpandAncestors(node.Children, target))
+        if (current.HasChildren)
+        {
+            foreach (var child in current.Children)
             {
-                node.IsExpanded = true;
-                return true;
+                if (child == target || ExpandAncestorsRecursive(child, target, ref changed))
+                {
+                    if (!current.IsExpanded)
+                    {
+                        current.IsExpanded = true;
+                        changed = true;
+                    }
+                    return true;
+                }
             }
         }
         return false;
     }
 
-    private void SelectNodeInTree(ObjectNode node)
+    private void SelectNodeInListBox(ObjectNode node)
     {
-        if (_treeView == null) return;
-        _treeView.SelectedItem = node;
-    }
-
-    private void OnTreeViewSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (_isSyncingFromEditor) return;
-
-        if (e.AddedItems.Count > 0 && e.AddedItems[0] is ObjectNode node)
+        if (_listBox == null) return;
+        
+        var index = _flattenedItems.IndexOfNode(node);
+        if (index >= 0 && index < _flattenedItems.Count)
         {
-            SelectedNode = node;
+            _listBox.SelectedIndex = index;
+            _listBox.ScrollIntoView(index);
         }
     }
 
@@ -400,14 +559,34 @@ public class ObjectViewer : TemplatedControl
             _searchTextBox?.Focus();
             e.Handled = true;
         }
+        
+        // Handle Enter/Space to toggle expand on selected item
+        if ((e.Key == Key.Enter || e.Key == Key.Space) && _listBox?.SelectedItem is FlattenedNode flatNode && flatNode.CanExpand)
+        {
+            ToggleNode(flatNode.Node);
+            e.Handled = true;
+        }
+        
+        // Handle Left/Right arrows for collapse/expand
+        if (e.Key == Key.Right && _listBox?.SelectedItem is FlattenedNode rightNode && rightNode.CanExpand && !rightNode.IsExpanded)
+        {
+            ToggleNode(rightNode.Node);
+            e.Handled = true;
+        }
+        if (e.Key == Key.Left && _listBox?.SelectedItem is FlattenedNode leftNode && leftNode.CanExpand && leftNode.IsExpanded)
+        {
+            ToggleNode(leftNode.Node);
+            e.Handled = true;
+        }
     }
 
     private void OnValueChanged()
     {
-        _items.Clear();
+        _flattenedItems.Clear();
         if (Value != null)
         {
-            _items.Add(new ObjectNode(Value, null, MaxDepth));
+            var rootNode = new ObjectNode(Value, null, MaxDepth);
+            _flattenedItems.AddRootNode(rootNode);
         }
     }
 }
