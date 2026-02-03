@@ -31,6 +31,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DumpViewer\ObjectViewer.csproj" />
+    <ProjectReference Include="..\ObjectViewer\ObjectViewer.csproj" />
   </ItemGroup>
 </Project>
