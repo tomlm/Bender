@@ -21,8 +21,6 @@ namespace DumpViewer;
 /// </summary>
 public class ObjectViewer : TemplatedControl
 {
-    private TextBox? _searchTextBox;
-    private Button? _searchButton;
     private ListBox? _listBox;
     private TextEditor? _textEditor;
     private bool _isSyncingFromTree;
@@ -152,14 +150,6 @@ public class ObjectViewer : TemplatedControl
         base.OnApplyTemplate(e);
 
         // Unsubscribe from old controls
-        if (_searchTextBox != null)
-        {
-            _searchTextBox.KeyDown -= OnSearchTextBoxKeyDown;
-        }
-        if (_searchButton != null)
-        {
-            _searchButton.Click -= OnSearchButtonClick;
-        }
         if (_listBox != null)
         {
             _listBox.SelectionChanged -= OnListBoxSelectionChanged;
@@ -172,20 +162,10 @@ public class ObjectViewer : TemplatedControl
         }
 
         // Get new controls
-        _searchTextBox = e.NameScope.Find<TextBox>("PART_SearchTextBox");
-        _searchButton = e.NameScope.Find<Button>("PART_SearchButton");
         _listBox = e.NameScope.Find<ListBox>("PART_ListBox");
         _textEditor = e.NameScope.Find<TextEditor>("PART_TextEditor");
 
         // Subscribe to events
-        if (_searchTextBox != null)
-        {
-            _searchTextBox.KeyDown += OnSearchTextBoxKeyDown;
-        }
-        if (_searchButton != null)
-        {
-            _searchButton.Click += OnSearchButtonClick;
-        }
         if (_listBox != null)
         {
             _listBox.SelectionChanged += OnListBoxSelectionChanged;
@@ -603,37 +583,6 @@ public class ObjectViewer : TemplatedControl
     private (int startOffset, int endOffset) GetCharacterOffsets(int startLine, int startCol, int endLine, int endCol)
     {
         return (_textEditor.Document.GetOffset(startLine, startCol), _textEditor.Document.GetOffset(endLine, endCol));
-    }
-
-    private void OnSearchTextBoxKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
-        {
-            PerformSearch();
-            e.Handled = true;
-        }
-    }
-
-    private void OnSearchButtonClick(object? sender, RoutedEventArgs e)
-    {
-        PerformSearch();
-    }
-
-    private void PerformSearch()
-    {
-        var searchText = _searchTextBox?.Text;
-        // TODO: Implement search functionality
-    }
-
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        base.OnKeyDown(e);
-
-        if (e.Key == Key.F && e.KeyModifiers.HasFlag(KeyModifiers.Control))
-        {
-            _searchTextBox?.Focus();
-            e.Handled = true;
-        }
     }
 
     private void OnValueChanged()

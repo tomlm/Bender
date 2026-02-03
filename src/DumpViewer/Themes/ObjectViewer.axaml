@@ -23,24 +23,6 @@
     <Setter Property="Template">
         <ControlTemplate>
             <Border Padding="{DynamicResource ObjectViewerPadding}" Background="#1E1E1E">
-                <DockPanel>
-                    <!-- Search Panel -->
-                    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-                        <TextBox Name="PART_SearchTextBox"
-                                 Grid.Column="0"
-                                 Watermark="Search..."
-                                 Background="#2D2D2D"
-                                 Foreground="#D4D4D4"
-                                 BorderBrush="#3F3F46"
-                                 Margin="0,0,4,0"/>
-                        <Button Name="PART_SearchButton"
-                                Grid.Column="1"
-                                Content="Search"
-                                Background="#0E639C"
-                                Foreground="White"
-                                Padding="12,6"/>
-                    </Grid>
-                        
                     <!-- Main content with optional raw text pane -->
                     <Grid ColumnDefinitions="*,Auto,400">
                             <!-- Virtualized ListBox (left side) - handles 400k+ items efficiently -->
@@ -162,7 +144,6 @@
                             </Grid>
                         </Border>
                     </Grid>
-                </DockPanel>
             </Border>
         </ControlTemplate>
     </Setter>
