@@ -24,7 +24,7 @@
         <ControlTemplate>
             <Border Padding="{DynamicResource ObjectViewerPadding}" Background="#1E1E1E">
                     <!-- Main content with optional raw text pane -->
-                    <Grid ColumnDefinitions="*,Auto,400">
+                    <Grid ColumnDefinitions="*,Auto,*">
                             <!-- Virtualized ListBox (left side) - handles 400k+ items efficiently -->
                             <ListBox Name="PART_ListBox"
                                      Grid.Column="0"

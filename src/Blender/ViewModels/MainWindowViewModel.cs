@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
-using System.Xml;
+using System.Xml.Linq;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -272,11 +272,9 @@ public partial class MainWindowViewModel : ViewModelBase
         return JToken.Load(jsonReader, new JsonLoadSettings { LineInfoHandling = LineInfoHandling.Load });
     }
 
-    private static XmlDocument ParseXml(string data)
+    private static XDocument ParseXml(string data)
     {
-        var doc = new XmlDocument();
-        doc.LoadXml(data);
-        return doc;
+        return XDocument.Parse(data, LoadOptions.SetLineInfo);
     }
 
     private static YamlStream ParseYaml(string data)

@@ -5,6 +5,7 @@ using System.Dynamic;
 using System.Linq;
 using System.Reflection;
 using System.Xml;
+using System.Xml.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -162,11 +163,11 @@ public partial class ObjectNode : ObservableObject
         if (Value is YamlDocument yamlDoc) return yamlDoc.RootNode != null ? 1 : 0;
 
         // XML
-        if (Value is XmlDocument xmlDoc) return xmlDoc.DocumentElement != null ? 1 : 0;
-        if (Value is XmlElement xmlElement)
+        if (Value is XDocument xDoc) return xDoc.Root != null ? 1 : 0;
+        if (Value is XElement xElement)
         {
-            int count = xmlElement.Attributes?.Count ?? 0;
-            count += xmlElement.ChildNodes.Cast<XmlNode>().Count(n => n is XmlElement);
+            int count = xElement.Attributes().Count();
+            count += xElement.Elements().Count();
             return count;
         }
 
@@ -239,8 +240,8 @@ public partial class ObjectNode : ObservableObject
             return ((int)yamlNode.Start.Line, (int)yamlNode.Start.Column, (int)yamlNode.End.Line, (int)yamlNode.End.Column);
         }
         
-        // XML nodes can provide line info via IXmlLineInfo
-        if (value is XmlNode xmlNode && xmlNode is System.Xml.IXmlLineInfo lineInfo && lineInfo.HasLineInfo())
+        // LINQ to XML nodes (XDocument, XElement, XAttribute) implement IXmlLineInfo
+        if (value is XObject xObject && xObject is IXmlLineInfo lineInfo && lineInfo.HasLineInfo())
         {
             return (lineInfo.LineNumber, lineInfo.LinePosition, null, null);
         }
@@ -313,16 +314,16 @@ public partial class ObjectNode : ObservableObject
             return (NodeKind.Object, "", "Document", yamlDoc.RootNode != null);
         }
 
-        // XML nodes
-        if (value is XmlDocument xmlDoc)
+        // XML nodes (LINQ to XML)
+        if (value is XDocument xDoc)
         {
-            return (NodeKind.Object, "", "XmlDocument", xmlDoc.DocumentElement != null);
+            return (NodeKind.Object, "", "XDocument", xDoc.Root != null);
         }
-        if (value is XmlElement xmlElement)
+        if (value is XElement xElement)
         {
-            var childElements = xmlElement.ChildNodes.Cast<XmlNode>().Where(n => n is XmlElement).ToList();
-            var attrCount = xmlElement.Attributes?.Count ?? 0;
-            var textContent = GetXmlTextContent(xmlElement);
+            var childElements = xElement.Elements().ToList();
+            var attrCount = xElement.Attributes().Count();
+            var textContent = GetXElementTextContent(xElement);
 
             // If element has only text content (no child elements, no attributes), treat as a leaf with the text value
             if (childElements.Count == 0 && attrCount == 0)
@@ -333,15 +334,20 @@ public partial class ObjectNode : ObservableObject
             }
 
             // Check if all child elements have the same name (it's an array container)
-            var distinctNames = childElements.Select(e => ((XmlElement)e).Name).Distinct().ToList();
+            var distinctNames = childElements.Select(e => e.Name.LocalName).Distinct().ToList();
             if (distinctNames.Count == 1 && childElements.Count > 1)
             {
                 return (NodeKind.Collection, $"({childElements.Count} items)", "Array", true);
             }
 
             // Has children or attributes - it's a complex object
-            var objTypeName = _inferredItemTypeName ?? xmlElement.Name;
+            var objTypeName = _inferredItemTypeName ?? xElement.Name.LocalName;
             return (NodeKind.Object, "", objTypeName, true);
+        }
+        if (value is XAttribute xAttr)
+        {
+            // Attributes are always string values
+            return (NodeKind.String, $"\"{EscapeString(xAttr.Value)}\"", "string", false);
         }
 
         // ExpandoObject or dynamic objects (from CsvHelper dynamic records)
@@ -556,33 +562,27 @@ public partial class ObjectNode : ObservableObject
             return children;
         }
 
-        // XML Document
-        if (Value is XmlDocument xmlDoc && xmlDoc.DocumentElement != null)
+        // XML Document (LINQ to XML)
+        if (Value is XDocument xDoc && xDoc.Root != null)
         {
-            children.Add(new ObjectNode(xmlDoc.DocumentElement, xmlDoc.DocumentElement.Name, _maxDepth, _currentDepth + 1, newVisited));
+            children.Add(new ObjectNode(xDoc.Root, xDoc.Root.Name.LocalName, _maxDepth, _currentDepth + 1, newVisited));
             return children;
         }
 
-        // XML Element
-        if (Value is XmlElement xmlElement)
+        // XML Element (LINQ to XML)
+        if (Value is XElement xElement)
         {
             // Add attributes first
-            if (xmlElement.Attributes != null)
+            foreach (var attr in xElement.Attributes())
             {
-                foreach (XmlAttribute attr in xmlElement.Attributes)
-                {
-                    children.Add(new ObjectNode(attr.Value, $"@{attr.Name}", _maxDepth, _currentDepth + 1, newVisited));
-                }
+                children.Add(new ObjectNode(attr, $"@{attr.Name.LocalName}", _maxDepth, _currentDepth + 1, newVisited));
             }
 
             // Group child elements by name to detect arrays
-            var childElements = xmlElement.ChildNodes.Cast<XmlNode>()
-                .Where(n => n is XmlElement)
-                .Cast<XmlElement>()
-                .ToList();
+            var childElements = xElement.Elements().ToList();
 
             // Check if all child elements have the same name (it's an array)
-            var distinctNames = childElements.Select(e => e.Name).Distinct().ToList();
+            var distinctNames = childElements.Select(e => e.Name.LocalName).Distinct().ToList();
             
             if (distinctNames.Count == 1 && childElements.Count > 0)
             {
@@ -600,7 +600,7 @@ public partial class ObjectNode : ObservableObject
                 // Mixed children - use element names
                 foreach (var childElement in childElements)
                 {
-                    children.Add(new ObjectNode(childElement, childElement.Name, _maxDepth, _currentDepth + 1, newVisited));
+                    children.Add(new ObjectNode(childElement, childElement.Name.LocalName, _maxDepth, _currentDepth + 1, newVisited));
                 }
             }
             return children;
@@ -616,6 +616,7 @@ public partial class ObjectNode : ObservableObject
             }
             return children;
         }
+
 
         // Dynamic objects like FastDynamicObject (from CsvHelper)
         if (Value is IDictionary<string, object> dynamicDict && IsDynamicObject(type))
@@ -743,11 +744,13 @@ public partial class ObjectNode : ObservableObject
                   .Replace("\t", "\\t");
     }
 
-    private static string GetXmlTextContent(XmlElement element)
+    private static string GetXElementTextContent(XElement element)
     {
-        return string.Join("", element.ChildNodes.Cast<XmlNode>()
-            .Where(n => n is XmlText or XmlCDataSection)
-            .Select(n => n.Value?.Trim() ?? ""))
+        // Get direct text content, excluding child elements
+        return string.Join("", element.Nodes()
+            .Where(n => n is XText)
+            .Cast<XText>()
+            .Select(t => t.Value?.Trim() ?? ""))
             .Trim();
     }
 

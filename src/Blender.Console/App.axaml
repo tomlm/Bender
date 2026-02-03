@@ -11,6 +11,6 @@
     </Application.Resources>
     <Application.Styles>
         <console:ModernTheme />
-        <StyleInclude Source="avares://DumpViewer/Themes/ObjectViewer.axaml"/>
+        <StyleInclude Source="avares://ObjectViewer/Themes/ObjectViewer.axaml"/>
     </Application.Styles>
 </Application>

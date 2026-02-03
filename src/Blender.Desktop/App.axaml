@@ -13,6 +13,6 @@
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml"/>
-        <StyleInclude Source="avares://DumpViewer/Themes/ObjectViewer.axaml"/>
+        <StyleInclude Source="avares://ObjectViewer/Themes/ObjectViewer.axaml"/>
     </Application.Styles>
 </Application>
