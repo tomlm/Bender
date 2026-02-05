@@ -124,11 +124,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public string Greeting { get; } = "Welcome to Avalonia!";
 
-    [RelayCommand]
-    private void ShowRawView() => ViewMode = ViewMode.Raw;
-
-    [RelayCommand]
-    private void ShowObjectsView() => ViewMode = ViewMode.Objects;
 
     [RelayCommand]
     private async Task OpenFileAsync()
@@ -167,6 +162,34 @@ public partial class MainWindowViewModel : ViewModelBase
     private void CloseWindow()
     {
         Window?.Close();
+    }
+
+    [RelayCommand]
+    private async Task ShowHelpAsync()
+    {
+        if (Window == null)
+            return;
+
+        var helpText = AppViewModel.GetHelpText();
+        var dialog = new Avalonia.Controls.Window
+        {
+            Title = "About Blender",
+            Width = 500,
+            Height = 400,
+            WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterOwner,
+            Content = new Avalonia.Controls.ScrollViewer
+            {
+                Content = new Avalonia.Controls.TextBlock
+                {
+                    Text = helpText,
+                    FontFamily = new Avalonia.Media.FontFamily("Consolas, Courier New, monospace"),
+                    Margin = new Avalonia.Thickness(16),
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap
+                }
+            }
+        };
+
+        await dialog.ShowDialog(Window);
     }
 
     /// <summary>

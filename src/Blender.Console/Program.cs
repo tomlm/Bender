@@ -1,5 +1,8 @@
 using Avalonia;
+using System.IO;
+using Blender.ViewModels;
 using Consolonia;
+using System.CommandLine.IO;
 
 namespace Blender.Console
 {
@@ -7,6 +10,12 @@ namespace Blender.Console
     {
         private static void Main(string[] args)
         {
+            if (args.Contains("-h") || args.Contains("--help"))
+            {
+                System.Console.WriteLine(AppViewModel.GetHelpText());
+                return;
+            }
+
             BuildAvaloniaApp()
                 .StartWithConsoleLifetime(args);
         }

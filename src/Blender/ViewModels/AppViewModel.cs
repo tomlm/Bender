@@ -47,12 +47,29 @@ public partial class AppViewModel : ViewModelBase
     private string? _errorMessage;
 
     /// <summary>
+    /// Gets whether the help option was requested.
+    /// </summary>
+    [ObservableProperty]
+    private bool _helpRequested;
+
+    /// <summary>
     /// Parses command line arguments.
     /// </summary>
     /// <param name="args">Command line arguments</param>
     /// <returns>True if successful, false if there was an error</returns>
     public async Task<bool> ParseArgumentsAsync(string[] args)
     {
+        // Check for help option before parsing
+        foreach (var arg in args)
+        {
+            if (arg == "-h" || arg == "--help" || arg == "-?" || arg == "/?")
+            {
+                HelpRequested = true;
+                System.Console.WriteLine(GetHelpText());
+                return true;
+            }
+        }
+
         var fileOption = new Option<FileInfo?>(
             aliases: ["-f", "--file"],
             description: "Path to the input file to read");
@@ -106,6 +123,33 @@ public partial class AppViewModel : ViewModelBase
         Format = DetermineFormat(isXml, isYaml, isJson, isCsv);
 
         return true;
+    }
+
+    /// <summary>
+    /// Gets the help text for display in a dialog or console.
+    /// </summary>
+    public static string GetHelpText()
+    {
+        return """
+            Blender - Visualize structured text data
+
+            Usage: blender [options]
+
+            Options:
+              -f, --file <path>   Path to the input file to read
+              -x, --xml           Force XML format
+              -y, --yml           Force YAML format
+              -j, --json          Force JSON format
+              -c, --csv           Force CSV format
+              -h, --help          Show this help message
+
+            If no file is specified, data is read from stdin.
+            If no format is specified, the format is auto-detected.
+
+            Keyboard Shortcuts:
+              Ctrl+O              Open file
+              Ctrl+W              Close window
+            """;
     }
 
     private static DataFormat DetermineFormat(bool isXml, bool isYaml, bool isJson, bool isCsv)

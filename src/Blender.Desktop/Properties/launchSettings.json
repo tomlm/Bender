@@ -2,7 +2,7 @@
   "profiles": {
     "Blender.Desktop": {
       "commandName": "Project",
-      "commandLineArgs": "-f s:\\big.json\r\n"
+      "commandLineArgs": "-h\r\n"
     }
   }
 }
