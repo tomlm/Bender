@@ -2,7 +2,7 @@
   <Folder Name="/Solution Items/">
     <File Path="../README.md" />
   </Folder>
-  <Project Path="PrettyStick.Console/PrettyStick.Console.csproj" />
+  <Project Path="PrettyStick.Shared/PrettyStick.Shared.csproj" />
   <Project Path="PrettyStick.Desktop/PrettyStick.Desktop.csproj" />
   <Project Path="PrettyStick/PrettyStick.csproj" />
   <Project Path="ObjectViewer/ObjectViewer.csproj" />
