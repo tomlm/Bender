@@ -295,13 +295,78 @@ public class ObjectViewer : TemplatedControl
 
         _textEditor.IsReadOnly = true;
         _textEditor.ShowLineNumbers = true;
-        _textEditor.FontFamily = new FontFamily("Consolas, Monaco, 'Courier New', monospace");
-        _textEditor.FontSize = 13;
-        _textEditor.Background = Brushes.Transparent;
-        _textEditor.Foreground = new SolidColorBrush(Color.Parse("#D4D4D4"));
+        //_textEditor.FontFamily = new FontFamily("Consolas, Monaco, 'Courier New', monospace");
+        //_textEditor.FontSize = 13;
+        //_textEditor.Background = Brushes.Transparent;
+        //_textEditor.Foreground = new SolidColorBrush(Color.Parse("#D4D4D4"));
+        _textEditor.TextArea.SelectionBrush = new SolidColorBrush(Color.FromArgb(128, 255, 255, 255));
 
         _registryOptions = new RegistryOptions(ThemeName.DarkPlus);
         _textmate = _textEditor.InstallTextMate(_registryOptions);
+        ApplyTheme(this, _textmate);
+    }
+
+    private void ApplyTheme(object? sender, TextMate.Installation e)
+    {
+        ApplyBrushAction(e, "editor.background", brush => _textEditor.Background = brush);
+        ApplyBrushAction(e, "editor.foreground", brush => _textEditor.TextArea.Foreground = brush);
+
+        if (!ApplyBrushAction(e, "editor.selectionBackground",
+                brush => _textEditor.TextArea.SelectionBrush = brush))
+        {
+            if (!ApplyBrushAction(e, "editor.selectionHighlightBackground",
+                    brush => _textEditor.TextArea.SelectionBrush = brush))
+            {
+                if (Application.Current!.TryGetResource("TextAreaSelectionBrush", out var resourceObject))
+                {
+                    if (resourceObject is IBrush brush)
+                    {
+                        _textEditor.TextArea.SelectionBrush = brush;
+                    }
+                    else
+                    {
+                        // make the selection brush the inverse of the background by default, this way it will always be visible, even if the theme doesn't specify a selection color.
+                        // compute the inverse of the background color for the selection brush
+                        var backgroundColor = _textEditor.Background as SolidColorBrush;
+                        _textEditor.TextArea.SelectionBrush = new SolidColorBrush(Color.FromArgb(
+                                128,
+                                (byte)(255 - backgroundColor.Color.R),
+                                (byte)(255 - backgroundColor.Color.G),
+                                (byte)(255 - backgroundColor.Color.B)));
+                    }
+                }
+            }
+        }
+
+        if (!ApplyBrushAction(e, "editor.lineHighlightBackground",
+                brush =>
+                {
+                    _textEditor.TextArea.TextView.CurrentLineBackground = brush;
+                }))
+        {
+            _textEditor.TextArea.TextView.SetDefaultHighlightLineColors();
+        }
+
+        //Todo: looks like the margin doesn't have a active line highlight, would be a nice addition
+        if (!ApplyBrushAction(e, "editorLineNumber.foreground",
+                brush => _textEditor.LineNumbersForeground = brush))
+        {
+            _textEditor.LineNumbersForeground = _textEditor.TextArea.Foreground;
+        }
+        _textEditor.TextArea.TextView.CurrentLineBorder = new Pen(Brushes.Transparent, thickness: 0);
+    }
+
+    bool ApplyBrushAction(TextMate.Installation e, string colorKeyNameFromJson, Action<IBrush> applyColorAction)
+    {
+        if (!e.TryGetThemeColor(colorKeyNameFromJson, out var colorString))
+            return false;
+
+        if (!Color.TryParse(colorString, out Color color))
+            return false;
+
+        var colorBrush = new SolidColorBrush(color);
+        applyColorAction(colorBrush);
+        return true;
     }
 
 

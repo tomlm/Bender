@@ -11,38 +11,38 @@
 
 	<!-- Default layout resources (can be overridden in App.axaml) -->
 	<Styles.Resources>
-		<!-- ObjectViewer layout -->
+	<!--	--><!-- ObjectViewer layout --><!--
 		<Thickness x:Key="ObjectViewerPadding">8</Thickness>
 		<x:Double x:Key="ObjectViewerFontSize">13</x:Double>
 		<Thickness x:Key="ObjectViewerItemSpacing">0,0,4,0</Thickness>
 		<x:Double x:Key="ObjectViewerRawPaneWidth">400</x:Double>
 		<x:Double x:Key="ObjectViewerIndentWidth">16</x:Double>
 
-		<!-- ListBoxItem layout -->
+		--><!-- ListBoxItem layout --><!--
 		<Thickness x:Key="ObjectViewerListBoxItemPadding">2</Thickness>
 		<Thickness x:Key="ObjectViewerListBoxItemMargin">0</Thickness>
 		<x:Double x:Key="ObjectViewerListBoxItemMinHeight">20</x:Double>
 
-		<!-- Expand icon -->
+		--><!-- Expand icon --><!--
 		<x:Double x:Key="ObjectViewerExpandIconWidth">20</x:Double>
 
-		<!-- Line number indicator -->
+		--><!-- Line number indicator --><!--
 		<x:Double x:Key="ObjectViewerLineNumberFontSize">10</x:Double>
 		<Thickness x:Key="ObjectViewerLineNumberMargin">0,0,6,0</Thickness>
 
-		<!-- Values preview -->
+		--><!-- Values preview --><!--
 		<Thickness x:Key="ObjectViewerValuesPreviewMargin">4,0,0,0</Thickness>
 
-		<!-- GridSplitter -->
+		--><!-- GridSplitter --><!--
 		<x:Double x:Key="ObjectViewerSplitterWidth">4</x:Double>
 
-		<!-- Raw pane -->
+		--><!-- Raw pane --><!--
 		<x:Double x:Key="ObjectViewerRawPaneMinWidth">200</x:Double>
 		<Thickness x:Key="ObjectViewerRawPaneBorderThickness">1,0,0,0</Thickness>
 
-		<!-- Raw pane header -->
+		--><!-- Raw pane header --><!--
 		<Thickness x:Key="ObjectViewerHeaderPadding">8,4</Thickness>
-		<x:Double x:Key="ObjectViewerHeaderFontSize">11</x:Double>
+		<x:Double x:Key="ObjectViewerHeaderFontSize">11</x:Double>-->
 	</Styles.Resources>
 
 	<!-- ObjectViewer template using virtualized ListBox -->
@@ -79,6 +79,15 @@
 							<ListBox.ItemTemplate>
 								<DataTemplate DataType="dv:FlattenedNode">
 									<StackPanel Orientation="Horizontal">
+										<!-- Line number indicator -->
+										<TextBlock Text="{Binding StartLine}"
+												   IsVisible="{Binding HasSourceLocation}"
+												   Foreground="#6A9955"
+												   FontSize="{DynamicResource ObjectViewerLineNumberFontSize}"
+												   VerticalAlignment="Center"
+												   Margin="{DynamicResource ObjectViewerLineNumberMargin}"
+												   Opacity="0.7"/>
+
 										<!-- Indentation spacer based on depth -->
 										<Border Width="{Binding IndentWidth}" />
 
@@ -88,15 +97,6 @@
 												   FontFamily="Consolas"
 												   Width="{DynamicResource ObjectViewerExpandIconWidth}"
 												   VerticalAlignment="Center"/>
-
-										<!-- Line number indicator -->
-										<TextBlock Text="{Binding StartLine, StringFormat='L{0}'}"
-												   IsVisible="{Binding HasSourceLocation}"
-												   Foreground="#6A9955"
-												   FontSize="{DynamicResource ObjectViewerLineNumberFontSize}"
-												   VerticalAlignment="Center"
-												   Margin="{DynamicResource ObjectViewerLineNumberMargin}"
-												   Opacity="0.7"/>
 
 										<!-- Property name -->
 										<TextBlock Text="{Binding Name}"

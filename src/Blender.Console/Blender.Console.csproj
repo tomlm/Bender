@@ -39,6 +39,7 @@
     <ItemGroup>
         <PackageReference Include="Consolonia" Version="11.3.*-beta.*" />
         <PackageReference Include="Consolonia.AvaloniaEdit" Version="11.3.7-beta.2027" />
+        <PackageReference Include="Consolonia.Themes" Version="11.3.9-beta.2218" />
     </ItemGroup>
     
     <ItemGroup>

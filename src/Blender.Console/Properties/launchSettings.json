@@ -1,8 +1,7 @@
 {
   "profiles": {
     "Blender.Console": {
-      "commandName": "Project",
-      "commandLineArgs": "-h\r\n"
+      "commandName": "Project"
     }
   }
 }
