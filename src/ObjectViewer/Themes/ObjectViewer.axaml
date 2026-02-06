@@ -80,7 +80,7 @@
 								<DataTemplate DataType="dv:FlattenedNode">
 									<StackPanel Orientation="Horizontal">
 										<!-- Line number indicator -->
-										<TextBlock Text="{Binding StartLine}"
+										<TextBlock Text="{Binding StartLine, StringFormat='{}{0,5}'}"
 												   IsVisible="{Binding HasSourceLocation}"
 												   Foreground="#6A9955"
 												   FontSize="{DynamicResource ObjectViewerLineNumberFontSize}"
@@ -162,7 +162,6 @@
 											   ShowLineNumbers="True"
 											   WordWrap="False"
 											   FontFamily="Consolas, Monaco, 'Courier New', monospace"
-											   FontSize="{DynamicResource ObjectViewerFontSize}"
 											   Background="#1E1E1E"
 											   Foreground="#D4D4D4"
 											   LineNumbersForeground="#858585"
