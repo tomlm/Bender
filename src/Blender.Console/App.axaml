@@ -15,7 +15,7 @@
 		<Thickness x:Key="ObjectViewerPadding">0</Thickness>
 		<x:Double x:Key="ObjectViewerFontSize">1</x:Double>
 		<Thickness x:Key="ObjectViewerItemSpacing">0</Thickness>
-		<x:Double x:Key="ObjectViewerRawPaneWidth">20</x:Double>
+		<x:Double x:Key="ObjectViewerSourceTextWidth">20</x:Double>
 		<x:Double x:Key="ObjectViewerIndentWidth">2</x:Double>
 
 		<!-- ListBoxItem layout -->
@@ -37,8 +37,8 @@
 		<x:Double x:Key="ObjectViewerSplitterWidth">1</x:Double>
 
 		<!-- Raw pane -->
-		<x:Double x:Key="ObjectViewerRawPaneMinWidth">20</x:Double>
-		<Thickness x:Key="ObjectViewerRawPaneBorderThickness">1,0,0,0</Thickness>
+		<x:Double x:Key="ObjectViewerSourceTextMinWidth">20</x:Double>
+		<Thickness x:Key="ObjectViewerSourceTextBorderThickness">1,0,0,0</Thickness>
 
 		<!-- Raw pane header -->
 		<Thickness x:Key="ObjectViewerHeaderPadding">1,0</Thickness>

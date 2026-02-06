@@ -148,7 +148,7 @@ public partial class MainWindowViewModel : ViewModelBase
             ]
         });
 
-        if (files.Count == 0)
+        if (files == null || files.Count == 0)
             return;
 
         var file = files[0];
