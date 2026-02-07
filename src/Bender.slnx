@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="../README.md" />
+    <File Path=".editorconfig" />
+  </Folder>
+  <Project Path="Bender.Shared/Bender.Shared.csproj" />
+  <Project Path="Bender.Desktop/Bender.Desktop.csproj" />
+  <Project Path="Bender/Bender.csproj" />
+  <Project Path="ObjectViewer/ObjectViewer.csproj" />
+</Solution>
