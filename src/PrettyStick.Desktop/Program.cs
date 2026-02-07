@@ -1,9 +1,9 @@
 ﻿using Avalonia;
-using PrettyStick.ViewModels;
+using Bender.ViewModels;
 using System;
 using System.Linq;
 
-namespace PrettyStick.Desktop;
+namespace Bender.Desktop;
 
 class Program
 {

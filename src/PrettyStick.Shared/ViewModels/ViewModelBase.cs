@@ -1,6 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace PrettyStick.ViewModels;
+namespace Bender.ViewModels;
 
 public class ViewModelBase : ObservableObject
 {

@@ -1,8 +1,8 @@
 using Avalonia.Markup.Xaml;
 
-namespace PrettyStick.Console;
+namespace Bender.Console;
 
-public partial class App : PrettyStick.App
+public partial class App : Bender.App
 {
     public override void Initialize()
     {

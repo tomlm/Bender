@@ -1,9 +1,9 @@
 using System;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
-using PrettyStick.ViewModels;
+using Bender.ViewModels;
 
-namespace PrettyStick;
+namespace Bender;
 
 public class ViewLocator : IDataTemplate
 {

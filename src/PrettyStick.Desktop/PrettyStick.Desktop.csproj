@@ -24,6 +24,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PrettyStick.Shared\PrettyStick.Shared.csproj" />
+    <ProjectReference Include="..\Bender.Shared\Bender.Shared.csproj" />
   </ItemGroup>
 </Project>

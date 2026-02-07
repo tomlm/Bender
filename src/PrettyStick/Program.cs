@@ -1,10 +1,10 @@
 using Avalonia;
 using System.IO;
-using PrettyStick.ViewModels;
+using Bender.ViewModels;
 using Consolonia;
 using System.CommandLine.IO;
 
-namespace PrettyStick.Console
+namespace Bender.Console
 {
     public static class Program
     {

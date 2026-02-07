@@ -1,11 +1,11 @@
 ﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using PrettyStick.ViewModels;
-using PrettyStick.Views;
+using Bender.ViewModels;
+using Bender.Views;
 using System.Threading.Tasks;
 
-namespace PrettyStick
+namespace Bender
 {
     public class App : Application
     {

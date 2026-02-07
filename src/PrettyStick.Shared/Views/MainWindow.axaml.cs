@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 
-namespace PrettyStick.Views;
+namespace Bender.Views;
 
 public partial class MainWindow : Window
 {
