@@ -5,12 +5,15 @@ using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Bender.Shared.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CsvHelper;
+using Iciclecreek.Avalonia.WindowManager;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using YamlDotNet.RepresentationModel;
@@ -172,25 +175,25 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
 
         var helpText = ArgumentsModel.GetHelpText();
-        var dialog = new Avalonia.Controls.Window
+        var dialog = new PortableWindow
         {
             Title = "About Bender",
-            Width = 500,
-            Height = 400,
-            WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterOwner,
-            Content = new Avalonia.Controls.ScrollViewer
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            SizeToContent = SizeToContent.WidthAndHeight,
+            Content = new TextBlock
             {
-                Content = new Avalonia.Controls.TextBlock
-                {
-                    Text = helpText,
-                    FontFamily = new Avalonia.Media.FontFamily("Consolas, Courier New, monospace"),
-                    Margin = new Avalonia.Thickness(16),
-                    TextWrapping = Avalonia.Media.TextWrapping.Wrap
-                }
-            }
+                Text = helpText,
+                FontFamily = new FontFamily("Consolas, Courier New, monospace"),
+                TextWrapping = TextWrapping.Wrap
+            },
         };
 
         await dialog.ShowDialog(Window);
+    }
+
+    private void Dialog_KeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        throw new NotImplementedException();
     }
 
     /// <summary>
@@ -248,7 +251,7 @@ public partial class MainWindowViewModel : ViewModelBase
         const int BufferSize = 81920; // 80KB buffer
         using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize, useAsync: true);
         using var reader = new StreamReader(fileStream);
-        
+
         var result = new System.Text.StringBuilder((int)Math.Min(totalSize, int.MaxValue));
         var buffer = new char[BufferSize];
         int charsRead;
